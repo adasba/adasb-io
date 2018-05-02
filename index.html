@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    </head>
+    <body id="body" style="overflow:hidden;" oncontextmenu="return false;">
+        <img id="miner" src="miner.png">
+        <img id="defender" src="defend.png">
+        <img id="connector" src="connect.png">
+            <link href="https://fonts.googleapis.com/css?family=Ubuntu" rel="stylesheet">
+        <canvas id="myCanvas" width="1920" height="1080" style="position:absolute; top:0px; left:0px; z-index:0; display:none;"></canvas>
+        <canvas id="myCanvas2" width="1920" height="1080" style="position:absolute; top:0px; left:0px; z-index:1;"></canvas>
+        <script>
+            //canvas and context for rendering and scaling canvas
+            var c = document.getElementById("myCanvas");
+            var ctx = c.getContext("2d");
+            var c2 = document.getElementById("myCanvas2");
+            var ctx2 = c2.getContext("2d");
+            c2.width = window.innerWidth;
+            c2.height = window.innerHeight;
+
+            //"render loop" for scaling the thing to all browser sizes
+            function renderLoop() {
+                if (c2.width * (9 / 16) >= c2.height) {
+                    ctx2.drawImage(c, 0, 0, c2.height * (16 / 9), c2.height);
+                } else {
+                    ctx2.drawImage(c, 0, 0, c2.width, c2.width * (9 / 16));
+                }
+                ctx.fillStyle = "White";
+                ctx.fillRect(0, 0, 1920, 1080);
+                ctx.fillStyle = "Black";
+                requestAnimationFrame(renderLoop);
+            }   
+            renderLoop();
+
+            //keyboard
+            var keys = [];
+            var keys2 = [];
+            for (t1 = 0; 256 > t1; t1++) {
+                keys.push(false);
+                keys2.push(false);
+            }
+            document.addEventListener("keydown", function (e) {
+                keys[e.which] = true;
+                if (keys2[e.which] == false) {
+                    keys2[e.which] = true;
+                }
+            }, false);
+            document.addEventListener("keyup", function (e) {
+                keys[e.which] = false;
+                keys2[e.which] = false;
+            }, false);
+
+            //inputs for server, and outputs too
+            var inputs = { xPos: 0, yPos: 0, wheel2: 0, wheel: 0, id: Math.random(), mx: 0, my: 0, mice: [false, false, false], mice2: [false, false, false], keys: new Array, keys2: new Array, selected: 0 };
+            var outputs = [];
+            var whatResponse;
+            var pmx = 0;
+            var pmy = 0;
+
+            //function for sending data to and from the server
+            function getRequest2(whatMessage, msg2) {
+                var xhttp = new XMLHttpRequest();
+                if (whatMessage != "") {
+                    xhttp.open("POST", "http://50.39.110.171:80/" + msg2 + "/" + whatMessage, true);
+                }
+                xhttp.responseType = "text";
+                xhttp.onload = function () {
+                    if (this.readyState == 4 && this.status == 200) {
+                        whatResponse = this.response;
+                    }
+                };
+                xhttp.send();
+            }
+            function getRequest(message, message2) {
+                getRequest2(message, message2);
+                return whatResponse;
+            }
+
+            //mouse
+            document.addEventListener("mousemove", function () {
+                pmx = inputs.mx;
+                pmy = inputs.my;
+                if (c2.width * (9 / 16) >= c2.height) {
+                    inputs.mx = window.event.clientX * (1920 / (c2.height * (16 / 9)));
+                    inputs.my = window.event.clientY * (1080 / c2.height);
+                } else {
+                    inputs.mx = window.event.clientX * (1920 / (c2.width));
+                    inputs.my = window.event.clientY * (1080 / (c2.width * (9 / 16)));
+                }
+                if (inputs.mice[2] || (inputs.mice[0] && inputs.wheel2 == 0)) {
+                    inputs.xPos = inputs.xPos + (pmx - inputs.mx);
+                    inputs.yPos = inputs.yPos + (pmy - inputs.my);
+                }
+            }, false);
+            document.addEventListener("mousedown", function (e) {
+                inputs.mice[e.which - 1] = true;
+                // if (cC > 0) {
+                //     console.log("REEEEE")
+                //     inputs.mice2[e.which - 1] = true;
+                //     cC = -2;
+                // } else {
+                //     console.log("hecc")
+                //     inputs.mice2[e.which - 1] = false;
+                //     cC = -2;
+                // }
+                inputs.mice2[e.which - 1] = true;
+            }, false);
+            document.addEventListener("mouseup", function (e) {
+                inputs.mice[e.which - 1] = false;
+                inputs.mice2[e.which - 1] = false;
+            }, false);
+
+            //mouse wheel
+            c2.addEventListener("mousewheel", function (e) {
+                if (e.wheelDelta) {
+                    inputs.wheel = e.wheelDelta / 120;
+                } else {
+                    inputs.wheel = 0;
+                }
+            });
+
+            //tests for json string
+            function isJsonString(str) {
+                try {
+                    JSON.parse(str);
+                } catch (e) {
+                    return false;
+                }
+                return true;
+            }
+            
+            //window resize
+            window.addEventListener("resize", function () {
+                c2.width = window.innerWidth;
+                c2.height = window.innerHeight;
+            }, false);
+
+            //timer variables
+            var lC = 0;
+            var t1 = 0;
+            var cC = 0;
+            var t2 = 0;
+            var t3 = 0;
+
+            //scroll functions
+            function dx(dx) {
+                return Math.floor(dx - inputs.xPos);
+            }
+            function dy(dy) {
+                return Math.floor(dy - inputs.yPos);
+            }
+            
+            function wheelOffset(offset) {
+                return offset - Math.floor(inputs.wheel2) * 130;
+            }
+
+            //distance function
+            function dist(xDist, yDist) {
+                return Math.sqrt(xDist * xDist + yDist * yDist);
+            }   
+
+            function isTower(whatType) {
+                var iTT = 0;
+                var towerlist = ["connect", "defend", "mine"];
+                for (iTT = 0; towerlist.length > iTT; iTT++) {
+                    if (whatType == towerlist[iTT]) {
+                        return true;
+                    }
+                }
+            }
+
+            //loop function
+            ctx.lineWidth = 3;
+            function loop() {
+                //ctx.drawImage(miner, 50, 50)
+                // if (cC < 0 && cC != -2) {
+                //     inputs.mice2[0] = false;
+                //     inputs.mice2[1] = false;
+                //     inputs.mice2[2] = false;
+                // }
+                if (lC % 2 == 0) {
+                    inputs.keys = keys;
+                    inputs.keys2 = keys2;
+                    outputs = getRequest(JSON.stringify(inputs), "control");
+                    if (inputs.mice2[0] == true) {
+                        inputs.mice2[0] = false;
+                    }
+                    for (t1 = 0; keys2.length > t1; t1++) {
+                        if (keys2[t1] == true) {
+                            keys2[t1] = 2;
+                        }
+                    }
+                    if (isJsonString(outputs) == false) {
+                        outputs = [];
+                    } else {
+                        outputs = JSON.parse(outputs);
+                    }
+                }
+                ctx.lineWidth = 1
+                for (t1 = 0; outputs.length > t1; t1++) {
+                    if (outputs[t1].type == "connect") {
+                        if (outputs[t1].id == true) {
+                            ctx.strokeStyle = "Green";
+                            ctx.fillStyle = "Green";
+                        } else {
+                            ctx.strokeStyle = "Black";
+                            ctx.fillStyle = "Black";
+                        }
+                        for (t3 = 0; outputs.length > t3; t3++) {
+                            if (t1 != t3 && isTower(outputs[t3].type) && outputs[t3].id == outputs[t1].id && dist(outputs[t1].x - outputs[t3].x, outputs[t1].y - outputs[t3].y) < 175) {
+                                ctx.beginPath();
+                                ctx.moveTo(dx(outputs[t1].x), dy(outputs[t1].y));
+                                ctx.lineTo(dx(outputs[t3].x), dy(outputs[t3].y));
+                                ctx.stroke();
+                            }
+                        }
+                    }
+                }
+                for (t1 = 0; outputs.length > t1; t1++) {
+                    if (Math.abs(outputs[t1].x - (inputs.xPos) - 960) < 1160 && Math.abs(outputs[t1].y - (inputs.yPos) - 540) < 740) {
+                        if (outputs[t1].id == true) {
+                            ctx.strokeStyle = "Red";
+                            ctx.fillStyle = "Red";
+                        } else {
+                            ctx.strokeStyle = "Black";
+                            ctx.fillStyle = "Black";
+                        }
+                        if (outputs[t1].type == "defend") {
+                            // ctx.strokeRect(dx(outputs[t1].x) - 15, dy(outputs[t1].y) - 15, 30, 30);
+                            // ctx.beginPath();
+                            // ctx.arc(dx(outputs[t1].x), dy(outputs[t1].y), 8, 0, Math.PI * 2);
+                            // ctx.stroke();
+                            ctx.drawImage(defender, dx(outputs[t1].x) - 22, dy(outputs[t1].y) - 22)
+                            ctx.beginPath();
+                            ctx.globalAlpha = 0.015;
+                            ctx.arc(dx(outputs[t1].x), dy(outputs[t1].y), 275, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.globalAlpha = 0.2;
+                            ctx.stroke();
+                            ctx.globalAlpha = 1;
+                        }
+                        if (outputs[t1].type == "mine") {
+                            // ctx.strokeRect(dx(outputs[t1].x) - 10, dy(outputs[t1].y) - 10, 20, 20);
+                            // ctx.beginPath();
+                            // ctx.arc(dx(outputs[t1].x), dy(outputs[t1].y), 5, 0, Math.PI * 2);
+                            // ctx.stroke();
+                            ctx.drawImage(miner, dx(outputs[t1].x) - 15, dy(outputs[t1].y) - 15);
+                            ctx.beginPath();
+                            ctx.globalAlpha = 0.015;
+                            ctx.arc(dx(outputs[t1].x), dy(outputs[t1].y), 200, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.globalAlpha = 0.2;
+                            ctx.stroke();
+                            ctx.globalAlpha = 1;
+                        }
+                        if (outputs[t1].type == "connect") {
+                            if (outputs[t1].id == true) {
+                                ctx.strokeStyle = "Green";
+                                ctx.fillStyle = "Green";
+                            }
+                            //ctx.strokeRect(dx(outputs[t1].x) - 5, dy(outputs[t1].y) - 5, 10, 10);
+                            ctx.drawImage(connector, dx(outputs[t1].x) - 7, dy(outputs[t1].y) - 7);
+                            ctx.beginPath();
+                            ctx.globalAlpha = 0.03;
+                            ctx.arc(dx(outputs[t1].x), dy(outputs[t1].y), 175, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.globalAlpha = 0.2;
+                            ctx.stroke();
+                            ctx.globalAlpha = 1;
+                        }
+                        if (outputs[t1].type == "bullet") {
+                            ctx.beginPath();
+                            ctx.arc(dx(outputs[t1].x), dy(outputs[t1].y), 8, 0, Math.PI * 2);
+                            outputs[t1].x = outputs[t1].x + Math.cos(outputs[t1].dir) * 8;
+                            outputs[t1].y = outputs[t1].y + Math.sin(outputs[t1].dir) * 8;
+                            ctx.stroke();
+                        }
+                        if (outputs[t1].type == "score") {
+                            ctx.beginPath();
+                            ctx.arc(dx(outputs[t1].x), dy(outputs[t1].y), outputs[t1].resources / 25 + 8, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+                        if (outputs[t1].type == "bullet2") {
+                            ctx.beginPath();
+                            ctx.arc(dx(outputs[t1].x), dy(outputs[t1].y), 5, 0, Math.PI * 2);
+                            outputs[t1].x = outputs[t1].x + Math.cos(outputs[t1].dir) * 8;
+                            outputs[t1].y = outputs[t1].y + Math.sin(outputs[t1].dir) * 8;
+                            ctx.stroke();
+                        }
+                    }
+                    if (outputs[t1].type == "playerInfo") {
+                        ctx.font = "36px Ubuntu";
+                        ctx.textAlign = "center";
+                        ctx.fillStyle = "Black";
+                        ctx.fillText(outputs[t1].cash, 960, 935);
+                        if (outputs[t1].px) {
+                            inputs.xPos = outputs[t1].px - 960;
+                            inputs.yPos = outputs[t1].py - 540;
+                        }
+                    }
+                    ctx.beginPath();
+                    ctx.strokeStyle = "Black";
+                    ctx.fillStyle = "White";
+                    inputs.wheel2 = inputs.wheel2 + inputs.wheel * -1;
+                    inputs.wheel = 0;
+                    if (inputs.wheel2 < 0) {
+                        inputs.wheel2 = 0;
+                    } else if (inputs.wheel2 > 4) {
+                        inputs.wheel2 = 4;
+                    }
+                    for (t2 = 0; 5 > t2; t2++) {
+                        ctx.rect(wheelOffset(910) + t2 * 130, 950, 100, 100);
+                    }
+                    if (keys[49]) {
+                        inputs.wheel2 = 0;
+                    }
+                    if (keys[50]) {
+                        inputs.wheel2 = 1;
+                    }
+                    if (keys[51]) {
+                        inputs.wheel2 = 2;
+                    }
+                    if (keys[52]) {
+                        inputs.wheel2 = 3;
+                    }
+                    if (keys[53]) {
+                        inputs.wheel2 = 4;
+                    }
+                    ctx.stroke();
+                    ctx.fill();
+                    ctx.font = "18px Ubuntu";
+                    ctx.fillStyle = "Black";
+                    ctx.fillText("Move", wheelOffset(960), 970);
+                    ctx.fillText("Right Click", wheelOffset(960), 990);
+                    ctx.fillText("Place", wheelOffset(960), 1010);
+                    ctx.fillText("Left Click", wheelOffset(960), 1030);
+                    ctx.fillText("Defense", wheelOffset(1090), 1000);
+                    ctx.fillText("Miner", wheelOffset(1220), 1000);
+                    ctx.fillText("Connector", wheelOffset(1350), 1000);
+                    ctx.beginPath();
+                    ctx.strokeRect(900, 940, 120, 120);
+                    //pmx = inputs.mx;
+                    //pmy = inputs.my;
+                }
+                lC++;
+                cC += 1;
+                requestAnimationFrame(loop);
+            }
+            loop();
+        </script>
+    </body>
+</html>
